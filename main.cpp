@@ -138,6 +138,8 @@ __global__ void projection_imaging_kernel(Float3 **pixels_centers, Plane1d *wall
 		pin_int.iy = floorf(pin.y);
 		pin_int.iz = floorf(pin.z - h); //converted to global coordinate before getting the index in cuboid
 		while( pin_int.ix >= 0 && pin_int.ix < Nx && pin_int.iy >= 0 && pin_int.iy < Ny && pin_int.iz >= 0 && pin_int.iz < Nz ){ //when the partical is still inside cuboid, cont. ray tracing
+			//fetch mu from *mus
+			mu = *(mus + pin_int.iz * (int)Nx * (int)Ny + pin_int.iy * (int)Nx + pin_int.ix);
 			float distance_onemove = onemove_in_cube(&pin, &unitvector, &out_intersection[0], &ID);
 			//update next incident point pin
 			pin.x = out_intersection[0];
@@ -147,8 +149,6 @@ __global__ void projection_imaging_kernel(Float3 **pixels_centers, Plane1d *wall
 			pin_int.ix = floorf(pin.x);
 			pin_int.iy = floorf(pin.y);
 			pin_int.iz = floorf(pin.z - h);
-			//fetch mu from *mus
-			mu = *(mus + pin_int.iz * (int)Nx * (int)Ny + pin_int.iy * (int)Nx + pin_int.ix);
 			w *= exp(- mu * distance_onemove); //update weight
 		}
 		//record the remaining weight
