@@ -21,6 +21,16 @@ using namespace std;
 #define offset_y 0.0f
 //detector resolution, change if you want, but it will significantly slow down your simulation if it is too small
 #define D 0.5f 
+#define CUDA_ASSERT(a) proimg_cu_assess(a) //macro to report CUDA errors
+
+
+void proimg_cu_assess(cudaError_t cuerr){
+     if(cuerr==cudaSuccess){
+         cout<<"Success!"<<endl;
+     }else{
+     	cout<<"Wrong!"<<endl;
+     }
+}
 
 //kernel function, runs on GPU, inputs: 2d array that stores the centers of each pixel of the detector; 1d array to store the info of 5 faces of cuboid; Float3 pointer of position of source
 									//  2d array to store the remaining weight (same dimension as pixel_centers); pointers store the dimension of two 2d arrays
@@ -252,38 +262,17 @@ int main(){
 	float **d_weight = NULL;  
 	float *d_data_weight = NULL;
 	//choose the GPU
-	cudaError_t cudaStatus;
-	cudaStatus = cudaSetDevice(0);
+	CUDA_ASSERT(cudaSetDevice(0));
 	//if memory allocation on GPU sucesss, it will print 'success' on terminal, if not, will print 'fail'
-	cudaStatus = cudaMalloc((void**)&d_weight, Rows * sizeof(float*));
-    if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMalloc((void**)&d_data_weight, Rows * Cols * sizeof(float));
-	   if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)&d_weight, Rows * sizeof(float*)));
+	CUDA_ASSERT(cudaMalloc((void**)&d_data_weight, Rows * Cols * sizeof(float)));
 	//host and device pixelcenters allocation, weight for output allocated as well
 	Float3 **h_pixels_centers = (Float3**)malloc(Rows * sizeof(Float3*));;
 	Float3 *h_data_pixels_centers = (Float3*)malloc(Rows * Cols * sizeof(Float3));
 	Float3 **d_pixels_centers = NULL;
 	Float3 *d_data_pixels_centers = NULL;
-	cudaStatus = cudaMalloc((void**)(&d_pixels_centers), Rows * sizeof(Float3*));
-    if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMalloc((void**)(&d_data_pixels_centers), Rows * Cols * sizeof(Float3));
-    if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)(&d_pixels_centers), Rows * sizeof(Float3*)));
+	CUDA_ASSERT(cudaMalloc((void**)(&d_data_pixels_centers), Rows * Cols * sizeof(Float3)));
     //calculate the postion of each pixel
 	for (int k = 0; k < Cols * Rows; k++){
 		int i = k % Cols;
@@ -298,109 +287,36 @@ int main(){
 		h_weight[i] = d_data_weight + i * Cols;
 	}
 	//copy the pixel center data from host to device
-	cudaStatus = cudaMemcpy((void*)d_data_pixels_centers, (void*)h_data_pixels_centers, Rows * Cols * sizeof(Float3), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_pixels_centers, (void*)h_pixels_centers, Rows * sizeof(Float3*), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_weight, (void*)h_weight, Rows * sizeof(float*), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMemcpy((void*)d_data_pixels_centers, (void*)h_data_pixels_centers, Rows * Cols * sizeof(Float3), cudaMemcpyHostToDevice));
+	CUDA_ASSERT(cudaMemcpy((void*)d_pixels_centers, (void*)h_pixels_centers, Rows * sizeof(Float3*), cudaMemcpyHostToDevice));
+	CUDA_ASSERT(cudaMemcpy((void*)d_weight, (void*)h_weight, Rows * sizeof(float*), cudaMemcpyHostToDevice));
 	//copy data of walls to device
 	Plane1d *d_walls;
-	cudaStatus = cudaMalloc((void**)(&d_walls), 6 * sizeof(Plane1d));
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_walls, (void*)walls, 6 * sizeof(Plane1d), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)(&d_walls), 6 * sizeof(Plane1d)));
+	CUDA_ASSERT(cudaMemcpy((void*)d_walls, (void*)walls, 6 * sizeof(Plane1d), cudaMemcpyHostToDevice));
 	//copy data of source to device
 	Float3 *d_source;
-	cudaStatus = cudaMalloc((void**)&d_source, sizeof(Float3));
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_source, (void*)&source, sizeof(Float3), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)&d_source, sizeof(Float3)));
+	CUDA_ASSERT(cudaMemcpy((void*)d_source, (void*)&source, sizeof(Float3), cudaMemcpyHostToDevice));
 	//copy data of mu to device as a 1D array
 	float *d_mus;
-	cudaStatus = cudaMalloc((void**)&d_mus, Dim_total * sizeof(float));
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_mus, (void*)mus, Dim_total * sizeof(float), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)&d_mus, Dim_total * sizeof(float)));
+	CUDA_ASSERT(cudaMemcpy((void*)d_mus, (void*)mus, Dim_total * sizeof(float), cudaMemcpyHostToDevice));
     //copy the dimension of detector to device
 	int *d_Rows, *d_Cols;
-	cudaStatus = cudaMalloc((void**)&d_Rows, sizeof(int));
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMalloc((void**)&d_Cols, sizeof(int));
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_Rows, (void*)&Rows, sizeof(int), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
-	cudaStatus = cudaMemcpy((void*)d_Cols, (void*)&Cols, sizeof(int), cudaMemcpyHostToDevice);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }else{
-    	cout<< "wrong" <<endl;
-    }
+	CUDA_ASSERT(cudaMalloc((void**)&d_Rows, sizeof(int)));
+	CUDA_ASSERT(cudaMalloc((void**)&d_Cols, sizeof(int)));
+	CUDA_ASSERT(cudaMemcpy((void*)d_Rows, (void*)&Rows, sizeof(int), cudaMemcpyHostToDevice));
+	CUDA_ASSERT(cudaMemcpy((void*)d_Cols, (void*)&Cols, sizeof(int), cudaMemcpyHostToDevice));
 	//specified the dimension of each block
 	dim3 threadPerBlock(32, 32);
 	dim3 blockNumber( (Cols + threadPerBlock.x -1)/threadPerBlock.x,  (Rows + threadPerBlock.y -1)/threadPerBlock.y);
 	//call the kernel to achieve parallel computation
 	projection_imaging_kernel<<<blockNumber, threadPerBlock>>>(d_pixels_centers, d_walls, d_mus, d_source, d_weight, d_Rows, d_Cols);
 	//let the CPU stream wait up for all GPU work is done
-    cudaStatus = cudaDeviceSynchronize();
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" << endl;
-    }else{
-    	cout << cudaStatus << endl;
-    }
+    CUDA_ASSERT(cudaDeviceSynchronize());
     //copy the result from device to host
-	cudaStatus = cudaMemcpy((void*)h_data_weight, (void*)d_data_weight, Rows * Cols * sizeof(float), cudaMemcpyDeviceToHost);
-	if (cudaStatus == cudaSuccess) {
-        cout<< "success" <<endl;
-    }
+	CUDA_ASSERT(cudaMemcpy((void*)h_data_weight, (void*)d_data_weight, Rows * Cols * sizeof(float), cudaMemcpyDeviceToHost));
 	//output data to a .txt file
 	ofstream myfile("Projection.txt");                         
 	if (myfile.is_open()) {
